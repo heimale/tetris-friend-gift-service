@@ -3,14 +3,17 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const { init: initDB, Counter } = require("./db");
+const { registerGiftRoutes } = require("./gift-service");
 
 const logger = morgan("tiny");
 
 const app = express();
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: false, limit: "256kb" }));
+app.use(express.json({ limit: "256kb" }));
 app.use(cors());
 app.use(logger);
+
+registerGiftRoutes(app);
 
 // 首页
 app.get("/", async (req, res) => {
