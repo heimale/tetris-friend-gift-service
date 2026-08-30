@@ -209,7 +209,30 @@ function getTrustedOpenId(req) {
   return asText(req.headers["x-wx-openid"]).trim();
 }
 
+function isTrustedCloudPushRequest(req) {
+  const expectedSecret = asText(process.env.WECHAT_CLOUD_PUSH_SECRET).trim();
+  const requestSecret = asText(req.params && req.params.cloudPushSecret).trim();
+  const source = asText(req.headers && req.headers["x-wx-source"]).trim();
+  if (!source || !expectedSecret || !requestSecret) return false;
+  return signaturesEqual(requestSecret, expectedSecret);
+}
+
 function registerGiftRoutes(app) {
+  app.post("/wechat/message/cloud/:cloudPushSecret", async (req, res) => {
+    if (!isTrustedCloudPushRequest(req)) {
+      return res.status(403).send("invalid cloud push source");
+    }
+
+    try {
+      const result = await recordGiftDelivery(req.body);
+      if (!result.handled) return res.type("text/plain").send("success");
+      return res.json({ ErrCode: 0, ErrMsg: "Success" });
+    } catch (error) {
+      console.error("[gift] cloud delivery failed:", error.message);
+      return res.status(500).json({ ErrCode: 1, ErrMsg: "Delivery failed" });
+    }
+  });
+
   app.get("/wechat/message", (req, res) => {
     try {
       const messageCrypto = getMessageCrypto();
@@ -325,6 +348,7 @@ module.exports = {
   TREASURE_CHEST_GOOD_ID,
   WechatMessageCrypto,
   getTrustedOpenId,
+  isTrustedCloudPushRequest,
   normalizeGoods,
   recordGiftDelivery,
   registerGiftRoutes,
